@@ -1,0 +1,72 @@
+services:
+  mysqldb:
+    image: mysql:8.4 # Using long-term support (LTS) MySQL image
+    container_name: production_mysql_db
+    restart: unless-stopped
+
+    # 1. Decoupled Network Isolation
+    networks:
+      - backend_network
+
+    # 2. Production Performance Tweak (Passes custom flags directly to mysqld)
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-buffer-pool-size=1G # Adjust based on host RAM
+
+    # 3. Secure Secrets Management (Avoids plain text environment variables)
+    secrets:
+      - mysql_root_password
+      - mysql_password
+
+    # 4. Advanced Environment Configuration
+    environment:
+      MYSQL_DATABASE: app_production_db
+      MYSQL_USER: app_admin_user
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
+
+    # 5. Native Port Exposure (Bound only to localhost for host-only security)
+    ports:
+      - "127.0.0.1:3306:3306"
+
+    # 6. Advanced Volume Mapping & Auto-Initialization
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-config/my.cnf:/etc/mysql/conf.d/custom.cnf:ro # Custom config overrides
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro # Automated seeding/scripts
+
+    # 7. TCP Healthcheck for Fail-Safe Service Dependency
+    healthcheck:
+      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$(cat /run/secrets/mysql_root_password)" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Example Dependent App Service
+  app:
+    image: node:20-alpine
+    container_name: app_server
+    networks:
+      - backend_network
+    depends_on:
+      mysqldb:
+        condition: service_healthy # Block startup until MySQL is ready to accept queries
+
+# Externalizing Networks & Named Volumes
+networks:
+  backend_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+
+# Define External/Local Text Files for Secret Strings
+secrets:
+  mysql_root_password:
+    file: ./secrets/root_password.txt
+  mysql_password:
+    file: ./secrets/user_password.txt
