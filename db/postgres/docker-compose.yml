@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: pg_production
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGDATA: ${PGDATA}
+    # Advanced performance adjustments passed directly to the entrypoint
+    command: >
+      postgres -c shared_buffers=${POSTGRES_SHARED_BUFFERS} -c work_mem=${POSTGRES_WORK_MEM} -c maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM} -c effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE} -c max_connections=100 -c synchronous_commit=off 
+    ports:
+      - "5432:5432"
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      # Mount initialization scripts (executed in alphabetical order)
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - db_network
+    # Essential for preventing dependent apps from launching before PG is ready
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin_ui
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@company.local
+      PGADMIN_DEFAULT_PASSWORD: WebUiSecurePassword2026!
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "True"
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - db_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pg_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  db_network:
+    driver: bridge
