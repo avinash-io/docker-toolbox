@@ -1,0 +1,19 @@
+services:
+  obsidian:
+    image: lscr.io/linuxserver/obsidian:latest
+    container_name: obsidian
+    security_opt:
+      - seccomp=unconfined # Fixes compatibility issues with modern GUI app syscall restrictions
+    environment:
+      - PUID=1000 # Adjust to match your host user ID
+      - PGID=1000 # Adjust to match your host group ID
+      - TZ=America/New_York # Set your local timezone
+      - SUBFOLDER=/ # Optional, use for reverse proxy configurations
+    volumes:
+      - ./config:/config # Stores Obsidian internal configuration files
+      - /path/to/your/vaults:/vaults # Maps your local note vaults to the container
+    ports:
+      - "3000:3000" # HTTP Access port
+      - "3001:3001" # HTTPS Access port (Highly recommended for full audio/video features)
+    shm_size: "1gb" # Prevents browser-renderer crashes inside the container
+    restart: unless-stopped
