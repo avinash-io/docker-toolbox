@@ -1,0 +1,51 @@
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis_db
+    restart: always
+    environment:
+      - REDIS_PASSWORD=my_ultra_secure_password
+    ports:
+      - "127.0.0.1:6379:6379" # Secures port by binding ONLY to localhost
+    volumes:
+      - redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass my_ultra_secure_password --appendonly yes
+    networks:
+      - backend_network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2gb
+        reservations:
+          memory: 512mb
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "my_ultra_secure_password", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # Built-in GUI for database monitoring and management
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: redis_insight
+    restart: always
+    ports:
+      - "8001:8001"
+    volumes:
+      - redis_insight_data:/data
+    networks:
+      - backend_network
+    depends_on:
+      redis:
+        condition: service_healthy
+
+networks:
+  backend_network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  redis_insight_data:
