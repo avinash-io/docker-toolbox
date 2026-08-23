@@ -1,5 +1,11 @@
 services:
   floci:
     image: floci/floci:latest
+    container_name: floci_ui
     ports:
       - "4566:4566"
+    volumes:
+      # This line gives Floci access to your local Docker engine
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
